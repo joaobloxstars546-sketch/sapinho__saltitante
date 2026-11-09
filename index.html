@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sapinho Saltitante</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #17252a;
+      color: #f4f7e8;
+      font-family: "Courier New", monospace;
+    }
+    .wrap { width: min(94vw, 820px); text-align: center; }
+    h1 { margin: 0 0 12px; color: #b7f36b; font-size: clamp(22px, 4vw, 32px); }
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 4px solid #b7f36b;
+      border-radius: 8px;
+      background: #9bd8e8;
+      image-rendering: pixelated;
+      box-shadow: 0 12px 0 #0c171b;
+    }
+    p { line-height: 1.6; margin: 14px 0 0; }
+    kbd {
+      background: #f4f7e8; color: #17252a; padding: 3px 7px;
+      border-radius: 4px; border-bottom: 3px solid #aeb7a2;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>🐸 SAPINHO SALTITANTE</h1>
+    <canvas id="game" width="800" height="400" aria-label="Jogo do sapinho"></canvas>
+    <p>Pule com <kbd>ESPAÇO</kbd> ou <kbd>↑</kbd> · Recomece com <kbd>R</kbd></p>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const W = canvas.width;
+    const H = canvas.height;
+    const groundY = 330;
+
+    let frog, rocks, score, speed, spawnTimer, gameOver, started;
+    let lastTime = 0;
+
+    function reset() {
+      frog = { x: 105, y: groundY - 42, w: 42, h: 42, vy: 0, onGround: true };
+      rocks = [];
+      score = 0;
+      speed = 5;
+      spawnTimer = 65;
+      gameOver = false;
+      started = false;
+    }
+
+    function jump() {
+      if (gameOver) return;
+      started = true;
+      if (frog.onGround) {
+        frog.vy = -13.5;
+        frog.onGround = false;
+      }
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.code === "Space" || e.code === "ArrowUp") {
+        e.preventDefault();
+        if (gameOver) return;
+        if (!e.repeat) jump();
+      }
+      if (e.key.toLowerCase() === "r" && gameOver) reset();
+    });
+
+    canvas.addEventListener("pointerdown", () => {
+      if (gameOver) reset();
+      else jump();
+    });
+
+    function pixel(x, y, w, h, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.round(x), Math.round(y), w, h);
+    }
+
+    function drawBackground() {
+      // Céu e nuvens quadradinhas
+      pixel(0, 0, W, H, "#9bd8e8");
+      pixel(85, 65, 55, 14, "#e9fbf5");
+      pixel(105, 51, 34, 14, "#e9fbf5");
+      pixel(122, 65, 42, 14, "#e9fbf5");
+      pixel(565, 90, 62, 14, "#e9fbf5");
+      pixel(585, 76, 34, 14, "#e9fbf5");
+      pixel(608, 90, 38, 14, "#e9fbf5");
+
+      // Morros ao fundo
+      pixel(0, 250, 150, 80, "#79bd76");
+      pixel(80, 225, 170, 105, "#79bd76");
+      pixel(205, 260, 180, 70, "#79bd76");
+      pixel(430, 245, 180, 85, "#79bd76");
+      pixel(590, 230, 210, 100, "#79bd76");
+
+      // Chão
+      pixel(0, groundY, W, H - groundY, "#8b5a35");
+      pixel(0, groundY, W, 9, "#4d9b48");
+      for (let x = 8; x < W; x += 38) {
+        pixel(x, groundY + 20 + (x % 3) * 5, 8, 5, "#a96d40");
+        pixel(x + 15, groundY + 48, 5, 5, "#684329");
+      }
+    }
+
+    function drawFrog() {
+      const x = Math.round(frog.x);
+      const y = Math.round(frog.y);
+      // Corpo
+      pixel(x + 5, y + 13, 32, 25, "#39a852");
+      pixel(x + 1, y + 20, 8, 14, "#39a852");
+      pixel(x + 33, y + 20, 8, 14, "#39a852");
+      // Cabeça e olhos
+      pixel(x + 4, y + 3, 34, 23, "#48c765");
+      pixel(x + 7, y, 10, 12, "#48c765");
+      pixel(x + 25, y, 10, 12, "#48c765");
+      pixel(x + 10, y + 5, 5, 6, "#ffffff");
+      pixel(x + 27, y + 5, 5, 6, "#ffffff");
+      pixel(x + 12, y + 7, 3, 4, "#17252a");
+      pixel(x + 28, y + 7, 3, 4, "#17252a");
+      // Barriguinha e sorriso
+      pixel(x + 12, y + 25, 18, 9, "#a6e86c");
+      pixel(x + 17, y + 20, 9, 3, "#1b6738");
+      // Patinhas
+      pixel(x + 1, y + 34, 13, 8, "#258d43");
+      pixel(x + 28, y + 34, 13, 8, "#258d43");
+    }
+
+    function drawRock(rock) {
+      const x = Math.round(rock.x), y = Math.round(rock.y);
+      pixel(x + 7, y, 25, 8, "#777b83");
+      pixel(x, y + 8, 39, 22, "#686d75");
+      pixel(x + 5, y + 30, 29, 7, "#555b63");
+      pixel(x + 11, y + 8, 7, 6, "#aeb4bb");
+      pixel(x + 26, y + 17, 5, 5, "#4c525a");
+    }
+
+    function drawHUD() {
+      pixel(18, 16, 150, 42, "#173c3b");
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 22px Courier New";
+      ctx.fillText("PONTOS: " + score, 30, 44);
+    }
+
+    function drawOverlay(title, subtitle) {
+      pixel(0, 0, W, H, "rgba(12, 23, 27, 0.58)");
+      pixel(170, 125, 460, 135, "#173c3b");
+      pixel(178, 133, 444, 119, "#245b4a");
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#c8ff83";
+      ctx.font = "bold 38px Courier New";
+      ctx.fillText(title, W / 2, 180);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 18px Courier New";
+      ctx.fillText(subtitle, W / 2, 220);
+      ctx.textAlign = "left";
+    }
+
+    function update(dt) {
+      if (!started || gameOver) return;
+
+      frog.vy += 0.68 * dt;
+      frog.y += frog.vy * dt;
+      if (frog.y >= groundY - frog.h) {
+        frog.y = groundY - frog.h;
+        frog.vy = 0;
+        frog.onGround = true;
+      }
+
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        const size = 28 + Math.floor(Math.random() * 13);
+        rocks.push({ x: W + 10, y: groundY - size, w: 39, h: size + 7, counted: false });
+        spawnTimer = 65 + Math.random() * 45;
+      }
+
+      for (const rock of rocks) {
+        rock.x -= speed * dt;
+        if (!rock.counted && rock.x + rock.w < frog.x) {
+          rock.counted = true;
+          score++;
+          if (score % 5 === 0) speed = Math.min(speed + 0.45, 10);
+        }
+
+        // Colisão com uma pequena margem para deixar o pulo justo.
+        const pad = 6;
+        if (
+          frog.x + pad < rock.x + rock.w - pad &&
+          frog.x + frog.w - pad > rock.x + pad &&
+          frog.y + frog.h - 4 > rock.y + 5
+        ) {
+          gameOver = true;
+        }
+      }
+      rocks = rocks.filter(rock => rock.x + rock.w > -10);
+    }
+
+    function draw() {
+      drawBackground();
+      for (const rock of rocks) drawRock(rock);
+      drawFrog();
+      drawHUD();
+
+      if (!started && !gameOver) {
+        drawOverlay("PRONTO?", "APERTE ESPAÇO PARA PULAR");
+      }
+      if (gameOver) {
+        drawOverlay("FIM DE JOGO", "PONTOS: " + score + "  |  APERTE R");
+      }
+    }
+
+    function loop(timestamp) {
+      const dt = Math.min((timestamp - lastTime) / 16.67 || 1, 2);
+      lastTime = timestamp;
+      update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    reset();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
