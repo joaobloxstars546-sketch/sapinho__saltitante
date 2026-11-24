@@ -51,6 +51,8 @@
     const groundY = 330;
 
     let frog, rocks, score, speed, spawnTimer, gameOver, started;
+    let doubleJumpUnlocked, doubleJumpUsed, timeStopCharges, timeStopTimer;
+    let powerMessage, powerMessageTimer, nextMilestone;
     let lastTime = 0;
 
     function reset() {
@@ -61,6 +63,13 @@
       spawnTimer = 65;
       gameOver = false;
       started = false;
+      doubleJumpUnlocked = false;
+      doubleJumpUsed = false;
+      timeStopCharges = 0;
+      timeStopTimer = 0;
+      powerMessage = "";
+      powerMessageTimer = 0;
+      nextMilestone = 25;
     }
 
     function jump() {
@@ -69,6 +78,12 @@
       if (frog.onGround) {
         frog.vy = -13.5;
         frog.onGround = false;
+        doubleJumpUsed = false;
+      } else if (doubleJumpUnlocked && !doubleJumpUsed) {
+        frog.vy = -12.5;
+        doubleJumpUsed = true;
+        powerMessage = "PULO DUPLO!";
+        powerMessageTimer = 45;
       }
     }
 
@@ -150,10 +165,35 @@
     }
 
     function drawHUD() {
-      pixel(18, 16, 150, 42, "#173c3b");
+      pixel(18, 16, 190, 42, "#173c3b");
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 22px Courier New";
       ctx.fillText("PONTOS: " + score, 30, 44);
+
+      pixel(585, 16, 197, 42, "#173c3b");
+      ctx.font = "bold 13px Courier New";
+      ctx.fillStyle = "#c8ff83";
+      const powers = [];
+      if (doubleJumpUnlocked) powers.push("PULO DUPLO");
+      if (timeStopCharges > 0) powers.push("TEMPO: " + timeStopCharges);
+      if (powers.length === 0) powers.push("PRÓXIMO: " + nextMilestone);
+      ctx.fillText(powers.join(" | "), 596, 42);
+
+      if (timeStopTimer > 0) {
+        pixel(285, 65, 230, 34, "#173c3b");
+        ctx.fillStyle = "#8ff7ff";
+        ctx.font = "bold 17px Courier New";
+        ctx.textAlign = "center";
+        ctx.fillText("TEMPO PARADO!", W / 2, 88);
+        ctx.textAlign = "left";
+      } else if (powerMessageTimer > 0) {
+        pixel(270, 65, 260, 34, "#173c3b");
+        ctx.fillStyle = "#c8ff83";
+        ctx.font = "bold 16px Courier New";
+        ctx.textAlign = "center";
+        ctx.fillText(powerMessage, W / 2, 88);
+        ctx.textAlign = "left";
+      }
     }
 
     function drawOverlay(title, subtitle) {
@@ -170,8 +210,29 @@
       ctx.textAlign = "left";
     }
 
+    function grantPowerUp() {
+      const choice = !doubleJumpUnlocked && Math.random() < 0.5 ? "double" : "time";
+      if (choice === "double") {
+        doubleJumpUnlocked = true;
+        powerMessage = "PULO DUPLO DESBLOQUEADO!";
+      } else {
+        timeStopCharges++;
+        powerMessage = "CARGA DE TEMPO!";
+      }
+      powerMessageTimer = 100;
+      nextMilestone += 25;
+    }
+
     function update(dt) {
       if (!started || gameOver) return;
+
+      if (powerMessageTimer > 0) powerMessageTimer -= dt;
+
+      // Durante o poder, pedras e sapinho ficam congelados.
+      if (timeStopTimer > 0) {
+        timeStopTimer -= dt;
+        return;
+      }
 
       frog.vy += 0.68 * dt;
       frog.y += frog.vy * dt;
@@ -194,6 +255,7 @@
           rock.counted = true;
           score++;
           if (score % 5 === 0) speed = Math.min(speed + 0.45, 10);
+          if (score >= nextMilestone) grantPowerUp();
         }
 
         // Colisão com uma pequena margem para deixar o pulo justo.
@@ -203,7 +265,15 @@
           frog.x + frog.w - pad > rock.x + pad &&
           frog.y + frog.h - 4 > rock.y + 5
         ) {
-          gameOver = true;
+          if (timeStopCharges > 0) {
+            timeStopCharges--;
+            timeStopTimer = 150; // cerca de 2,5 segundos
+            powerMessage = "VOCE ESCAPOU!";
+            powerMessageTimer = 100;
+            break;
+          } else {
+            gameOver = true;
+          }
         }
       }
       rocks = rocks.filter(rock => rock.x + rock.w > -10);
